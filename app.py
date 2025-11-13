@@ -1,9 +1,9 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import pickle
-import math  # DIUBAH: Mengganti numpy
-# import numpy as np  # DIUBAH: Dihapus
-# import pandas as pd # DIUBAH: Dihapus
+import math  # Mengganti numpy
+# import numpy as np  # Dihapus
+# import pandas as pd # Dihapus
 import os
 import traceback
 
@@ -49,9 +49,6 @@ def load_xgb_model():
             global model
             model = pickle.load(f)
         print("✓ Model loaded from PKL successfully.")
-        # Opsi: Cetak info model jika perlu, tapi n_features_in_ mungkin tidak ada
-        # print(f"Model n_features_in_: {model.n_features_in_}")
-        # print(f"Booster num features: {model.get_booster().num_features()}")
         return True
     except Exception as e:
         print(f"✗ Error loading model: {e}")
@@ -93,7 +90,7 @@ def status():
 
     if model and scaler:
         try:
-            # DIUBAH: Menggunakan list of list, bukan DataFrame Pandas
+            # Menggunakan list of list, bukan DataFrame Pandas
             test_data = [[50] * 12] 
             test_scaled = scaler.transform(test_data)
             test_pred = model.predict(test_scaled)
@@ -160,7 +157,7 @@ def predict():
                 try:
                     # Convert to float and validate
                     float_value = float(value)
-                    # DIUBAH: Menggunakan math.isnan dan math.isinf
+                    # Menggunakan math.isnan dan math.isinf
                     if math.isnan(float_value) or math.isinf(float_value):
                         invalid_features.append(f"{feature_name} (invalid number)")
                     else:
@@ -196,14 +193,13 @@ def predict():
                 'error': error_msg
             }), 400
         
-        # DIUBAH: Membuat list 1D sesuai urutan FEATURE_NAMES
+        # Membuat list 1D sesuai urutan FEATURE_NAMES
         features_list = [features_dict[name] for name in FEATURE_NAMES]
         print(f"📊 Features list: {features_list}")
         
         # Scale features
-        # DIUBAH: scaler.transform() menerima list of list [[...]]
+        # scaler.transform() menerima list of list [[...]]
         features_scaled = scaler.transform([features_list]) 
-        print(f"📈 Scaled features shape: {features_scaled.shape}")
         print(f"📈 Scaled features: {features_scaled}")
         
         # Make prediction
@@ -220,9 +216,8 @@ def predict():
         try:
             if hasattr(model, 'predict_proba'):
                 probabilities = model.predict_proba(features_scaled)
-                # DIUBAH: Import numpy hanya jika benar-benar dibutuhkan di sini
-                # Tapi XGBoost regressor tidak punya predict_proba, jadi bagian ini mungkin tidak berjalan
-                # Jika berjalan, kita perlu import numpy
+                # Bagian ini mungkin tidak berjalan jika modelnya regresi
+                # dan butuh numpy, tapi kita tidak impor di awal
                 import numpy as np 
                 confidence = float(np.max(probabilities) * 100)
                 print(f"📊 Confidence from predict_proba: {confidence}%")
