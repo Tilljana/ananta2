@@ -1,4 +1,4 @@
 flask
 flask-cors
-scikit-learn-core
+scikit-learn
 xgboost
