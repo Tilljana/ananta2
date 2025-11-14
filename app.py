@@ -1,25 +1,16 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import pickle
-import math  # Mengganti numpy
-# import numpy as np  # Dihapus
-# import pandas as pd # Dihapus
+import math
 import os
 import traceback
-# import requests  # DIHAPUS: Tidak perlu download
-# import io        # DIHAPUS: Tidak perlu download
+import xgboost as xgb  # DIUBAH: Impor xgboost
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# DIHAPUS: URL tidak dipakai lagi
-# MODEL_URL = "..."
-# SCALER_URL = "..."
-
-
-# Nama fitur yang digunakan saat pelatihan model
+# ... (FEATURE_NAMES dan FEATURE_MAPPING tetap sama) ...
 FEATURE_NAMES = [
     'Akses Jangkauan', 'Jumlah Keluarga Miskin', 'Rasio Penduduk Miskin Desil 1', 
     'Rumah tangga tanpa akses listrik', 'Produksi pangan', 'Luas lahan', 
@@ -27,20 +18,11 @@ FEATURE_NAMES = [
     'Rasio Rumah Tangga Tanpa Air Bersih', 'Rasio Tenaga Kesehatan', 
     'Total Keluarga Beresiko Stunting dan Keluarga rentan'
 ]
-
-# Pemetaan fitur input (X1, X2, ...) ke nama fitur deskriptif
 FEATURE_MAPPING = {
-    'X1': 'Akses Jangkauan',
-    'X2': 'Jumlah Keluarga Miskin',
-    'X3': 'Rasio Penduduk Miskin Desil 1',
-    'X4': 'Rumah tangga tanpa akses listrik',
-    'X5': 'Produksi pangan',
-    'X6': 'Luas lahan',
-    'X7': 'Rasio Sarana Pangan',
-    'X8': 'Persentase balita stunting',
-    'X9': 'Proporsi Penduduk Lanjut Usia',
-    'X10': 'Rasio Rumah Tangga Tanpa Air Bersih',
-    'X11': 'Rasio Tenaga Kesehatan',
+    'X1': 'Akses Jangkauan', 'X2': 'Jumlah Keluarga Miskin', 'X3': 'Rasio Penduduk Miskin Desil 1',
+    'X4': 'Rumah tangga tanpa akses listrik', 'X5': 'Produksi pangan', 'X6': 'Luas lahan',
+    'X7': 'Rasio Sarana Pangan', 'X8': 'Persentase balita stunting', 'X9': 'Proporsi Penduduk Lanjut Usia',
+    'X10': 'Rasio Rumah Tangga Tanpa Air Bersih', 'X11': 'Rasio Tenaga Kesehatan',
     'X12': 'Total Keluarga Beresiko Stunting dan Keluarga rentan'
 }
 
@@ -48,22 +30,28 @@ FEATURE_MAPPING = {
 model = None
 scaler = None
 
-# DIUBAH: Fungsi kembali membaca file lokal
+# DIUBAH: Fungsi ini sekarang memuat file .json
 def load_xgb_model():
-    """Load the XGBoost model from the local pickle file"""
+    """Load the XGBoost model from the local .json file"""
     try:
-        model_path = os.path.join(BASE_DIR, 'best_model_XGB.pkl')
-        with open(model_path, 'rb') as f:
-            global model
-            model = pickle.load(f)
-        print("✓ Model loaded from local PKL successfully.")
+        # Nama file baru: .json
+        model_path = os.path.join(BASE_DIR, 'best_model_XGB.json') 
+        
+        global model
+        # Buat instance model kosong (sesuaikan jika ini Classifier)
+        model = xgb.XGBRegressor() 
+        
+        # Muat model dari file .json
+        model.load_model(model_path) 
+        
+        print("✓ Model loaded from local JSON successfully.")
         return True
     except Exception as e:
         print(f"✗ Error loading local model: {e}")
         traceback.print_exc()
         return False
 
-# DIUBAH: Fungsi kembali membaca file lokal
+# Fungsi ini TIDAK BERUBAH, scaler.pkl tetap aman
 def load_scaler():
     """Load the scaler from the local pickle file"""
     try:
@@ -78,11 +66,12 @@ def load_scaler():
         traceback.print_exc()
         return False
 
+# ... (Sisa kode /predict dan lainnya SAMA PERSIS) ...
+# ... (Pastikan bagian if __name__ == '__main__': juga masih ada) ...
+
 # Load models at startup
 model_loaded = load_xgb_model()
 scaler_loaded = load_scaler()
-
-# (Sisa kode di bawah ini sama persis, tidak ada perubahan)
 
 @app.route('/')
 def home():
@@ -265,11 +254,9 @@ def internal_error(e):
         'error': 'Internal server error'
     }), 500
 
-# DIUBAH: Kode ini disesuaikan untuk Railway (mengambil $PORT)
+# Kode untuk Railway (mengambil $PORT)
 if __name__ == '__main__':
-    # Ambil port dari Railway, atau gunakan 5000 jika dijalankan lokal
     port = int(os.environ.get('PORT', 5000))
-    
     print("\n" + "="*60)
     print("🚀 Flask API + Web Server Starting")
     print("="*60)
@@ -277,10 +264,6 @@ if __name__ == '__main__':
     print(f"🤖 Model Status: {'✓ Loaded' if model else '✗ Not Loaded'}")
     print(f"📊 Scaler Status: {'✓ Loaded' if scaler else '✗ Not Loaded'}")
     print("="*60)
-    
-    # Menjalankan di host dan port yang benar
     print(f"📌 Running on http://0.0.0.0:{port}")
     print("="*60 + "\n")
-    
-    # Gunakan variabel port dan matikan debug untuk produksi
     app.run(host='0.0.0.0', port=port, threaded=True, debug=False)
