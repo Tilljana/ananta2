@@ -2,15 +2,20 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import pickle
 import math  # Mengganti numpy
-# import numpy as np  # Dihapus
-# import pandas as pd # Dihapus
 import os
 import traceback
+import requests  # DIUBAH: Ditambahkan untuk mengunduh model
+import io        # DIUBAH: Ditambahkan untuk membaca bytes model
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# DIUBAH: URL model dari Hugging Face Hub
+MODEL_URL = "https://huggingface.co/rudi562/pangannet/resolve/main/best_model_XGB.pkl?download=true"
+SCALER_URL = "https://huggingface.co/rudi562/pangannet/resolve/main/scaler.pkl?download=true"
+
 
 # Nama fitur yang digunakan saat pelatihan model
 FEATURE_NAMES = [
@@ -41,31 +46,45 @@ FEATURE_MAPPING = {
 model = None
 scaler = None
 
+# DIUBAH: Fungsi ini sekarang mengunduh model dari URL
 def load_xgb_model():
-    """Load the XGBoost model from the pickle file"""
+    """Load the XGBoost model from URL"""
     try:
-        model_path = os.path.join(BASE_DIR, 'best_model_XGB.pkl')
-        with open(model_path, 'rb') as f:
-            global model
-            model = pickle.load(f)
-        print("✓ Model loaded from PKL successfully.")
+        print(f"Mengunduh model dari {MODEL_URL}...")
+        global model
+        
+        r = requests.get(MODEL_URL)
+        r.raise_for_status()  # Cek jika ada error unduhan
+        
+        # Membaca konten yang diunduh sebagai file di memori
+        model_file = io.BytesIO(r.content)
+        model = pickle.load(model_file)
+        
+        print("✓ Model loaded from URL successfully.")
         return True
     except Exception as e:
-        print(f"✗ Error loading model: {e}")
+        print(f"✗ Error loading model from URL: {e}")
         traceback.print_exc()
         return False
 
+# DIUBAH: Fungsi ini sekarang mengunduh scaler dari URL
 def load_scaler():
-    """Load the scaler from the pickle file"""
+    """Load the scaler from URL"""
     try:
-        scaler_path = os.path.join(BASE_DIR, 'scaler.pkl')
-        with open(scaler_path, 'rb') as f:
-            global scaler
-            scaler = pickle.load(f)
-        print("✓ Scaler loaded successfully.")
+        print(f"Mengunduh scaler dari {SCALER_URL}...")
+        global scaler
+        
+        r = requests.get(SCALER_URL)
+        r.raise_for_status() # Cek jika ada error unduhan
+        
+        # Membaca konten yang diunduh sebagai file di memori
+        scaler_file = io.BytesIO(r.content)
+        scaler = pickle.load(scaler_file)
+        
+        print("✓ Scaler loaded from URL successfully.")
         return True
     except Exception as e:
-        print(f"✗ Error loading scaler: {e}")
+        print(f"✗ Error loading scaler from URL: {e}")
         traceback.print_exc()
         return False
 
