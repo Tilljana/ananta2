@@ -2,19 +2,21 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import pickle
 import math  # Mengganti numpy
+# import numpy as np  # Dihapus
+# import pandas as pd # Dihapus
 import os
 import traceback
-import requests  # DIUBAH: Ditambahkan untuk mengunduh model
-import io        # DIUBAH: Ditambahkan untuk membaca bytes model
+# import requests  # DIHAPUS: Tidak perlu download
+# import io        # DIHAPUS: Tidak perlu download
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# DIUBAH: URL model dari Hugging Face Hub
-MODEL_URL = "https://huggingface.co/rudi562/pangannet/resolve/main/best_model_XGB.pkl?download=true"
-SCALER_URL = "https://huggingface.co/rudi562/pangannet/resolve/main/scaler.pkl?download=true"
+# DIHAPUS: URL tidak dipakai lagi
+# MODEL_URL = "..."
+# SCALER_URL = "..."
 
 
 # Nama fitur yang digunakan saat pelatihan model
@@ -46,51 +48,41 @@ FEATURE_MAPPING = {
 model = None
 scaler = None
 
-# DIUBAH: Fungsi ini sekarang mengunduh model dari URL
+# DIUBAH: Fungsi kembali membaca file lokal
 def load_xgb_model():
-    """Load the XGBoost model from URL"""
+    """Load the XGBoost model from the local pickle file"""
     try:
-        print(f"Mengunduh model dari {MODEL_URL}...")
-        global model
-        
-        r = requests.get(MODEL_URL)
-        r.raise_for_status()  # Cek jika ada error unduhan
-        
-        # Membaca konten yang diunduh sebagai file di memori
-        model_file = io.BytesIO(r.content)
-        model = pickle.load(model_file)
-        
-        print("✓ Model loaded from URL successfully.")
+        model_path = os.path.join(BASE_DIR, 'best_model_XGB.pkl')
+        with open(model_path, 'rb') as f:
+            global model
+            model = pickle.load(f)
+        print("✓ Model loaded from local PKL successfully.")
         return True
     except Exception as e:
-        print(f"✗ Error loading model from URL: {e}")
+        print(f"✗ Error loading local model: {e}")
         traceback.print_exc()
         return False
 
-# DIUBAH: Fungsi ini sekarang mengunduh scaler dari URL
+# DIUBAH: Fungsi kembali membaca file lokal
 def load_scaler():
-    """Load the scaler from URL"""
+    """Load the scaler from the local pickle file"""
     try:
-        print(f"Mengunduh scaler dari {SCALER_URL}...")
-        global scaler
-        
-        r = requests.get(SCALER_URL)
-        r.raise_for_status() # Cek jika ada error unduhan
-        
-        # Membaca konten yang diunduh sebagai file di memori
-        scaler_file = io.BytesIO(r.content)
-        scaler = pickle.load(scaler_file)
-        
-        print("✓ Scaler loaded from URL successfully.")
+        scaler_path = os.path.join(BASE_DIR, 'scaler.pkl')
+        with open(scaler_path, 'rb') as f:
+            global scaler
+            scaler = pickle.load(f)
+        print("✓ Scaler loaded from local PKL successfully.")
         return True
     except Exception as e:
-        print(f"✗ Error loading scaler from URL: {e}")
+        print(f"✗ Error loading local scaler: {e}")
         traceback.print_exc()
         return False
 
 # Load models at startup
 model_loaded = load_xgb_model()
 scaler_loaded = load_scaler()
+
+# (Sisa kode di bawah ini sama persis, tidak ada perubahan)
 
 @app.route('/')
 def home():
@@ -109,7 +101,6 @@ def status():
 
     if model and scaler:
         try:
-            # Menggunakan list of list, bukan DataFrame Pandas
             test_data = [[50] * 12] 
             test_scaled = scaler.transform(test_data)
             test_pred = model.predict(test_scaled)
@@ -124,7 +115,6 @@ def status():
 def predict():
     """Make a prediction based on user input"""
     
-    # Handle CORS preflight
     if request.method == 'OPTIONS':
         return '', 204
     
@@ -132,7 +122,6 @@ def predict():
     print("📥 NEW PREDICTION REQUEST")
     print("="*60)
     
-    # Check if model and scaler are loaded
     if not model or not scaler:
         error_msg = 'Model atau scaler belum dimuat. Pastikan file model tersedia.'
         print(f"❌ {error_msg}")
@@ -142,7 +131,6 @@ def predict():
         }), 500
     
     try:
-        # Get JSON data from request
         try:
             data = request.get_json(force=True)
         except Exception as e:
@@ -161,22 +149,19 @@ def predict():
         
         print(f"📊 Data received: {data}")
         
-        # Validate and extract features, mapping input keys to feature names
         features_dict = {}
         missing_features = []
         invalid_features = []
         
         for feature_name in FEATURE_NAMES:
-            feature_key = [key for key, value in FEATURE_MAPPING.items() if value == feature_name][0]  # Mapping X1, X2, ...
+            feature_key = [key for key, value in FEATURE_MAPPING.items() if value == feature_name][0]
             value = data.get(feature_key)
             
             if value is None or value == '':
                 missing_features.append(feature_name)
             else:
                 try:
-                    # Convert to float and validate
                     float_value = float(value)
-                    # Menggunakan math.isnan dan math.isinf
                     if math.isnan(float_value) or math.isinf(float_value):
                         invalid_features.append(f"{feature_name} (invalid number)")
                     else:
@@ -184,7 +169,6 @@ def predict():
                 except (ValueError, TypeError) as e:
                     invalid_features.append(f"{feature_name} (value: {value})")
         
-        # Check for errors
         if missing_features:
             error_msg = f'Fitur yang hilang: {", ".join(missing_features)}'
             print(f"❌ {error_msg}")
@@ -203,7 +187,6 @@ def predict():
         
         print(f"✓ All features validated: {features_dict}")
         
-        # Check if all features are 0
         if all(value == 0 for value in features_dict.values()):
             error_msg = 'Semua fitur tidak boleh bernilai 0.'
             print(f"❌ {error_msg}")
@@ -212,31 +195,23 @@ def predict():
                 'error': error_msg
             }), 400
         
-        # Membuat list 1D sesuai urutan FEATURE_NAMES
         features_list = [features_dict[name] for name in FEATURE_NAMES]
         print(f"📊 Features list: {features_list}")
         
-        # Scale features
-        # scaler.transform() menerima list of list [[...]]
         features_scaled = scaler.transform([features_list]) 
         print(f"📈 Scaled features: {features_scaled}")
         
-        # Make prediction
         prediction = model.predict(features_scaled)
         score = float(prediction[0])
         
         print(f"🎯 Raw prediction: {prediction}")
         print(f"🎯 Prediction score: {score}")
         
-        # Calculate confidence (default for regression models)
         confidence = 96.8
         
-        # Try to get prediction intervals if available
         try:
             if hasattr(model, 'predict_proba'):
                 probabilities = model.predict_proba(features_scaled)
-                # Bagian ini mungkin tidak berjalan jika modelnya regresi
-                # dan butuh numpy, tapi kita tidak impor di awal
                 import numpy as np 
                 confidence = float(np.max(probabilities) * 100)
                 print(f"📊 Confidence from predict_proba: {confidence}%")
@@ -290,7 +265,11 @@ def internal_error(e):
         'error': 'Internal server error'
     }), 500
 
+# DIUBAH: Kode ini disesuaikan untuk Railway (mengambil $PORT)
 if __name__ == '__main__':
+    # Ambil port dari Railway, atau gunakan 5000 jika dijalankan lokal
+    port = int(os.environ.get('PORT', 5000))
+    
     print("\n" + "="*60)
     print("🚀 Flask API + Web Server Starting")
     print("="*60)
@@ -298,8 +277,10 @@ if __name__ == '__main__':
     print(f"🤖 Model Status: {'✓ Loaded' if model else '✗ Not Loaded'}")
     print(f"📊 Scaler Status: {'✓ Loaded' if scaler else '✗ Not Loaded'}")
     print("="*60)
-    print("📌 Local: http://localhost:5000")
-    print("📌 Network: http://0.0.0.0:5000")
+    
+    # Menjalankan di host dan port yang benar
+    print(f"📌 Running on http://0.0.0.0:{port}")
     print("="*60 + "\n")
     
-    app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
+    # Gunakan variabel port dan matikan debug untuk produksi
+    app.run(host='0.0.0.0', port=port, threaded=True, debug=False)
